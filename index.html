@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daizhi Liao · Blog</title>
+<style>
+:root{
+  --ink:#1d1d1f; --sub:#6e6e73; --bg:#fbfbfd;
+  --code-bg:#f5f5f7; --line:#e3e3e6; --accent:#0071e3;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+    "Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.75; font-size:17px; letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:88px 24px 96px;}
+h1.name{font-size:40px; font-weight:700; letter-spacing:-0.028em; margin:0 0 6px;}
+.handle{color:var(--sub); font-size:15px; margin-bottom:28px;}
+p.bio{color:#3a3a3c; margin:16px 0; max-width:620px;}
+.links{display:flex; gap:18px; flex-wrap:wrap; margin:20px 0 8px; font-size:15px;}
+.links a{color:var(--accent); text-decoration:none;}
+.links a:hover{text-decoration:underline;}
+h2.sec{
+  font-size:13px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--sub); margin:52px 0 16px;
+}
+a.post{
+  display:block; text-decoration:none; color:var(--ink);
+  background:var(--card, #fff); border:1px solid var(--line); border-radius:14px;
+  padding:18px 20px; margin:12px 0; transition:transform .15s ease, box-shadow .15s ease;
+}
+a.post:hover{transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.06); text-decoration:none;}
+a.post .pt{font-weight:600; font-size:17px; letter-spacing:-0.01em;}
+a.post .pd{color:var(--sub); font-size:14px; margin-top:5px; line-height:1.55;}
+a.post .pm{color:var(--sub); font-size:13px; margin-top:10px;}
+.tag{display:inline-block; font-size:12px; color:var(--sub);
+  background:var(--code-bg); border-radius:6px; padding:1px 8px; margin-right:6px;}
+footer{margin-top:64px; padding-top:24px; border-top:1px solid var(--line);
+  font-size:14px; color:var(--sub);}
+footer a{color:var(--accent); text-decoration:none;}
+@media (max-width:600px){.wrap{padding:56px 18px 72px;} h1.name{font-size:31px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="name">Daizhi Liao</h1>
+  <div class="handle">@dafahaha · Guangzhou, China</div>
+
+  <p class="bio">
+    Computer science student working on reinforcement learning and embodied AI,
+    with a side interest in the security and verifiability of deployed AI systems.
+    I write about the bugs I fix, the systems I build, and the engineering details
+    that are easy to gloss over but that decide whether something actually works.
+  </p>
+
+  <div class="links">
+    <a href="https://github.com/dafahaha" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://dafahaha.github.io/transit-truth/" target="_blank" rel="noopener">TransitTruth</a>
+    <a href="mailto:ldz@e.gzhu.edu.cn">Email</a>
+  </div>
+
+  <h2 class="sec">Writing</h2>
+
+  <a class="post" href="textworld-bug-fix.html">
+    <div class="pt">给微软 TextWorld 修了个 bug：一行正则，和它背后的多命令解析</div>
+    <div class="pd">一行多命令导致环境崩溃。根因是贪婪正则配合 DOTALL，把两个状态块缝成了一个——记录定位、修复、测试和与维护者 review 的全过程。</div>
+    <div class="pm"><span class="tag">Python</span><span class="tag">Regex</span><span class="tag">Open Source</span> microsoft/TextWorld · PR #377 merged</div>
+  </a>
+
+  <footer>
+    More on <a href="https://github.com/dafahaha" target="_blank" rel="noopener">github.com/dafahaha</a>.
+  </footer>
+
+</div>
+</body>
+</html>

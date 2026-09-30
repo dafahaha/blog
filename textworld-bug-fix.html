@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>给微软 TextWorld 修了个 bug：一行正则，和它背后的多命令解析</title>
+<style>
+:root{
+  --ink:#1d1d1f; --sub:#6e6e73; --bg:#fbfbfd; --card:#ffffff;
+  --code-bg:#f5f5f7; --line:#e3e3e6; --accent:#0071e3;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+    "Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.75; font-size:17px; letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:740px; margin:0 auto; padding:72px 24px 96px;}
+header.hero{margin-bottom:40px;}
+h1.title{
+  font-size:38px; line-height:1.18; font-weight:700; letter-spacing:-0.025em;
+  margin:0 0 16px; color:var(--ink);
+}
+.meta{font-size:14px; color:var(--sub); display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+.meta a{color:var(--accent); text-decoration:none;}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:var(--sub);display:inline-block;}
+h2{
+  font-size:25px; font-weight:700; letter-spacing:-0.02em;
+  margin:48px 0 14px; padding-top:8px; color:var(--ink);
+}
+h3{font-size:19px; font-weight:600; margin:32px 0 10px;}
+p{margin:14px 0;}
+a{color:var(--accent); text-decoration:none;}
+a:hover{text-decoration:underline;}
+strong{font-weight:650;}
+ul,ol{padding-left:24px; margin:14px 0;}
+li{margin:7px 0;}
+blockquote{
+  margin:22px 0; padding:6px 20px; border-left:3px solid var(--line);
+  color:var(--sub); font-size:15.5px;
+}
+blockquote p{margin:8px 0;}
+code{
+  font-family:"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  font-size:0.86em; background:var(--code-bg);
+  padding:2px 6px; border-radius:6px; color:#3a3a3c;
+}
+pre{
+  background:var(--code-bg); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; overflow-x:auto; margin:20px 0; line-height:1.6;
+}
+pre code{background:none; padding:0; font-size:13.5px; color:#2b2b2d; border-radius:0;}
+hr{border:none; border-top:1px solid var(--line); margin:44px 0;}
+table{border-collapse:collapse; width:100%; margin:20px 0; font-size:15px;}
+th,td{border:1px solid var(--line); padding:8px 12px; text-align:left;}
+th{background:var(--code-bg); font-weight:600;}
+footer{margin-top:64px; padding-top:24px; border-top:1px solid var(--line);
+  font-size:14px; color:var(--sub);}
+footer a{color:var(--accent);}
+@media (max-width:600px){
+  .wrap{padding:48px 18px 72px;}
+  h1.title{font-size:29px;} h2{font-size:22px;} body{font-size:16px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1 class="title">给微软 TextWorld 修了个 bug：一行正则，和它背后的多命令解析</h1>
+  <div class="meta">
+    <a href="https://github.com/microsoft/TextWorld/pull/377" target="_blank" rel="noopener">PR #377 · 已合并</a>
+    <span class="dot"></span>
+    <span>microsoft/TextWorld</span>
+    <span class="dot"></span>
+    <span>Daizhi Liao</span>
+  </div>
+</header>
+<blockquote>
+<p>相关 PR：<a href="https://github.com/microsoft/TextWorld/pull/377">microsoft/TextWorld#377</a>，已合并。
+改动很小，两个文件，核心是一行正则。但定位它的过程比改它有意思得多，记一下。</p>
+</blockquote>
+<h2>起因</h2>
+<p>TextWorld 是微软做的一个文本游戏环境，常被拿来当强化学习 / 具身智能的 benchmark——agent 接收一段自然语言描述的房间状态，输出 "go north"、"take key" 这种命令，环境再返回新的状态。</p>
+<p>我当时在翻它的 wrapper 代码，顺手在一个真实游戏里，把两条命令用句号拼在一行喂了进去：</p>
+<pre><code class="language-python">game_state, _, _ = env.step(&quot;go east. go west.&quot;)
+</code></pre>
+<p>然后环境直接炸了，抛了个 <code>ValueError</code>：</p>
+<pre><code>ValueError: invalid literal for int() with base 10: '...&lt;/moves&gt;\n\n&lt;score&gt;...'
+</code></pre>
+<p>单条命令完全正常，两条拼一起就崩。这是个很典型的"边界输入"问题——正常路径大家都测，把多条命令塞一行这种用法，没人覆盖到。</p>
+<h2>先搞清楚 Inform7 到底吐了什么</h2>
+<p>TextWorld 底层用的是 Inform 7 这个交互式小说引擎。为了让程序能解析游戏状态，引擎在正常的文本反馈之外，会额外打印一批带标签的结构化信息，大概长这样：</p>
+<pre><code>This is room. You can see a chest here.
+
+&lt;extras&gt;
+&lt;score&gt;
+0
+&lt;/score&gt;
+&lt;moves&gt;
+1
+&lt;/moves&gt;
+&lt;/extras&gt;
+</code></pre>
+<p>TextWorld 要做的，就是把 <code>&lt;score&gt;</code>、<code>&lt;moves&gt;</code> 这些标签里的内容抠出来，转成整数存到 <code>game_state</code> 上。</p>
+<p>关键点在这：<strong>当你一行喂了两条命令，Inform7 会老老实实地把这组标签打印两遍</strong>，每个命令对应一份：</p>
+<pre><code>&lt;score&gt;
+0
+&lt;/score&gt;
+&lt;moves&gt;
+1
+&lt;/moves&gt;
+... 中间是普通文本反馈 ...
+&lt;score&gt;
+0
+&lt;/score&gt;
+&lt;moves&gt;
+2
+&lt;/moves&gt;
+</code></pre>
+<p>而我们最终想要的，显然是<strong>最后一条命令</strong>执行完的状态（moves 应该等于 2）。</p>
+<h2>根因：贪婪匹配把两个块缝成了一个</h2>
+<p>解析标签的代码在 <code>textworld/envs/wrappers/tw_inform7.py</code> 的 <code>_detect_extra_infos</code> 里，原来长这样：</p>
+<pre><code class="language-python">regex = re.compile(r&quot;&lt;{tag}&gt;\n(.*)&lt;/{tag}&gt;&quot;.format(tag=tag), re.DOTALL)
+match = re.search(regex, text)
+if match:
+    _, cleaned_text = _detect_i7_events_debug_tags(match.group(1))
+    matches[tag] = cleaned_text.strip()
+    text = re.sub(regex, &quot;&quot;, text)
+</code></pre>
+<p>问题就出在这个正则上。两个地方叠加：</p>
+<ol>
+<li><code>(.*)</code> 是<strong>贪婪</strong>匹配，它会尽可能多地吃字符；</li>
+<li><code>re.DOTALL</code> 让 <code>.</code> 连换行符也能匹配。</li>
+</ol>
+<p>于是当文本里有两个 <code>&lt;score&gt;</code> 块时，<code>&lt;score&gt;\n(.*)&lt;/score&gt;</code> 的匹配方式是：从<strong>第一个</strong> <code>&lt;score&gt;</code> 开始，<code>(.*)</code> 一路吃到<strong>最后一个</strong> <code>&lt;/score&gt;</code> 才肯停。中间本该是"块结束 → 普通文本 → 块开始"的那一段，包括 <code>&lt;/score&gt;</code>、<code>&lt;moves&gt;...&lt;/moves&gt;</code> 这些，全被当成 score 的内容吞了进去。</p>
+<p>后面 <code>_gather_infos</code> 拿到这一大坨东西，照着老逻辑 <code>int(...)</code> 一转，里面混着 <code>&lt;moves&gt;</code> 标签和换行，自然就 <code>ValueError</code> 了。报错信息里那串 <code>...&lt;/moves&gt;...&lt;score&gt;...</code>，其实就是贪婪匹配的"犯罪现场"。</p>
+<p>这也是正则解析结构化文本的一个经典坑：<strong>只要你假设"这个标签只出现一次"，贪婪写法在出现第二次时就会悄悄出错</strong>，而且不会报错，只会给你一段意料之外的内容。</p>
+<h2>修复：非贪婪 + 取最后一块</h2>
+<p>改动其实就三处。</p>
+<p>第一，把贪婪的 <code>.*</code> 改成非贪婪的 <code>.*?</code>，这样每个标签块会被独立、完整地匹配，不会再跨块：</p>
+<p>第二，原来是 <code>re.search</code> 只拿到第一个匹配，现在用 <code>findall</code> 拿到所有块，然后<strong>显式取最后一个</strong> <code>all_matches[-1]</code>——对应多命令场景下最后一条命令的状态，这正是我们要报告给 agent 的结果：</p>
+<pre><code class="language-python">regex = re.compile(r&quot;&lt;{tag}&gt;\n(.*?)&lt;/{tag}&gt;&quot;.format(tag=tag), re.DOTALL)
+all_matches = regex.findall(text)
+if all_matches:
+    _, cleaned_text = _detect_i7_events_debug_tags(all_matches[-1])
+    matches[tag] = cleaned_text.strip()
+    text = regex.sub(&quot;&quot;, text)
+</code></pre>
+<p>顺带把 <code>re.sub(regex, "", text)</code> 换成了 <code>regex.sub("", text)</code>，复用同一个编译好的正则，没什么特别的，就是少传一遍参数。</p>
+<p>第三处是在不远处的 <code>_gather_infos</code>，原来有个裸 <code>except:</code>：</p>
+<pre><code class="language-python">try:
+    self.state[info] = int(self.state[info].strip())
+except:
+    self.state[info] = int(self.state[info].strip().split(&quot;\n&quot;)[0])
+</code></pre>
+<p>裸 <code>except</code> 会把 <code>KeyboardInterrupt</code>、<code>SystemExit</code> 这种也一并吞掉，是 PEP 8 明确不推荐的。这里真正想兜的只是"内容不是合法整数"，所以收窄成 <code>except ValueError</code>。</p>
+<h2>测试：别只证明它不崩了</h2>
+<p>光改解析逻辑不够，得有个测试把这个行为钉死，否则以后谁重构一下可能又回去了。我在 <code>test_tw_inform7.py</code> 里加了一个：</p>
+<pre><code class="language-python">def test_multiple_commands(self):
+    # 一行多命令不能崩，而且报告的应该是最后一条命令的状态
+    for env in [self.env_z8]:
+        env.reset()
+        game_state, _, _ = env.step(&quot;go east. go west.&quot;)
+        assert game_state.moves == 2
+</code></pre>
+<p>这里我特意没只断言"不抛异常"，而是断言 <code>moves == 2</code>。区别在于：如果哪天真的退回成"只取第一个块"，代码照样不崩，但 moves 会变成 1，这个测试依然能抓住它。<strong>测"取的是最后一块"比测"没崩"更接近这个 bug 的本质。</strong></p>
+<h2>Review 过程：维护者真正在意什么</h2>
+<p>这个 PR 来回了几轮，几个点让我印象挺深。</p>
+<p>Marc-Alexandre Côté（TextWorld 的作者）没有直接说"你这正则写错了"，而是先让我<strong>把 Inform7 实际输出的原始 observation 贴出来</strong>。确认了"每个命令打印一组标签、要取最后一组"这个事实之后，他才认可非贪婪 + 取最后一块的方向。换句话说，他先要证据，再看方案。</p>
+<p>中间他还提了两个要求：一个是前面说的裸 <code>except</code> 要按 PEP 8 收窄；另一个是测试文件的位置——我一开始把测试放在了顶层的 <code>tests/</code> 目录，但 TextWorld 的约定是 wrapper 的测试跟着 wrapper 走，应该放在 <code>textworld/envs/wrappers/tests/</code> 下面。我挪过去之后，还顺手解决了一个旧的 CI 失败：顶层有个同名测试模块，跟新位置的冲突了。</p>
+<p>等所有 check 变绿、CLA 签完，他就合并了。</p>
+<h2>几点收尾的体会</h2>
+<ul>
+<li><strong>报错信息要读全。</strong> 一开始那个 <code>int()</code> 报错，最有价值的不是 <code>ValueError</code> 本身，而是它里面那串 <code>...&lt;/moves&gt;...&lt;score&gt;...</code>——它直接告诉你，本应干净的数字里混进了别的标签，顺着这个去想"为什么两个块会缝在一起"，比盯着 <code>int()</code> 看快得多。</li>
+<li><strong>处理"可能重复出现"的结构，默认就该警惕贪婪匹配。</strong> <code>.*?</code> + <code>findall</code> 是更安全的直觉。</li>
+<li><strong>测试要钉住正确的语义（取最后一块），而不是钉住现象（没崩）。</strong></li>
+<li><strong>给成熟项目提 PR，代码只是一部分。</strong> 维护者会看你有没有先把事实搞清楚、有没有遵守项目的约定（目录结构、代码风格、CLA）。这些做到位，改动再小也会被认真对待。</li>
+</ul>
+<p>这个 bug 不复杂，但它是那种"真实用户在真实用法下会踩到"的问题——能把这种小而确定的东西修干净，我觉得比硬凑一个大而无当的 feature 实在。</p>
+<footer>
+  <a href="index.html">&larr; Blog</a> &nbsp;&middot;&nbsp; More on
+  <a href="https://github.com/dafahaha" target="_blank" rel="noopener">github.com/dafahaha</a>.
+</footer>
+</div>
+</body>
+</html>
