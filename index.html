@@ -66,6 +66,12 @@ footer a{color:var(--accent); text-decoration:none;}
 
   <h2 class="sec">Writing</h2>
 
+  <a class="post" href="ci-missing-deps.html">
+    <div class="pt">本地能跑、CI 却挂了：一个没写进 requirements 的 numpy，和它的 import 链</div>
+    <div class="pd">干净环境里 import 直接炸在 numpy——而我本地 anaconda 里它早就躺着。顺着 import 链定位、补声明 requirements 与 pyproject 两处，顺带揪出一个 BOM 的坑。</div>
+    <div class="pm"><span class="tag">Python</span><span class="tag">CI</span><span class="tag">Packaging</span> dafahaha/transit-truth · commit 6ebaa22</div>
+  </a>
+
   <a class="post" href="textworld-bug-fix.html">
     <div class="pt">给微软 TextWorld 修了个 bug：一行正则，和它背后的多命令解析</div>
     <div class="pd">一行多命令导致环境崩溃。根因是贪婪正则配合 DOTALL，把两个状态块缝成了一个——记录定位、修复、测试和与维护者 review 的全过程。</div>

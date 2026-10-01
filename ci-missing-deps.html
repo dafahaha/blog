@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本地能跑、CI 却挂了：一个没写进 requirements 的 numpy，和它的 import 链</title>
+<style>
+:root{
+  --ink:#1d1d1f; --sub:#6e6e73; --bg:#fbfbfd; --card:#ffffff;
+  --code-bg:#f5f5f7; --line:#e3e3e6; --accent:#0071e3;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+    "Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.75; font-size:17px; letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:740px; margin:0 auto; padding:72px 24px 96px;}
+header.hero{margin-bottom:40px;}
+h1.title{
+  font-size:38px; line-height:1.18; font-weight:700; letter-spacing:-0.025em;
+  margin:0 0 16px; color:var(--ink);
+}
+.meta{font-size:14px; color:var(--sub); display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+.meta a{color:var(--accent); text-decoration:none;}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:var(--sub);display:inline-block;}
+h2{
+  font-size:25px; font-weight:700; letter-spacing:-0.02em;
+  margin:48px 0 14px; padding-top:8px; color:var(--ink);
+}
+h3{font-size:19px; font-weight:600; margin:32px 0 10px;}
+p{margin:14px 0;}
+a{color:var(--accent); text-decoration:none;}
+a:hover{text-decoration:underline;}
+strong{font-weight:650;}
+ul,ol{padding-left:24px; margin:14px 0;}
+li{margin:7px 0;}
+blockquote{
+  margin:22px 0; padding:6px 20px; border-left:3px solid var(--line);
+  color:var(--sub); font-size:15.5px;
+}
+blockquote p{margin:8px 0;}
+code{
+  font-family:"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  font-size:0.86em; background:var(--code-bg);
+  padding:2px 6px; border-radius:6px; color:#3a3a3c;
+}
+pre{
+  background:var(--code-bg); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; overflow-x:auto; margin:20px 0; line-height:1.6;
+}
+pre code{background:none; padding:0; font-size:13.5px; color:#2b2b2d; border-radius:0;}
+hr{border:none; border-top:1px solid var(--line); margin:44px 0;}
+table{border-collapse:collapse; width:100%; margin:20px 0; font-size:15px;}
+th,td{border:1px solid var(--line); padding:8px 12px; text-align:left;}
+th{background:var(--code-bg); font-weight:600;}
+footer{margin-top:64px; padding-top:24px; border-top:1px solid var(--line);
+  font-size:14px; color:var(--sub);}
+footer a{color:var(--accent);}
+@media (max-width:600px){
+  .wrap{padding:48px 18px 72px;}
+  h1.title{font-size:29px;} h2{font-size:22px;} body{font-size:16px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1 class="title">本地能跑、CI 却挂了：一个没写进 requirements 的 numpy，和它的 import 链</h1>
+  <div class="meta">
+    <a href="https://github.com/dafahaha/transit-truth/commit/6ebaa22" target="_blank" rel="noopener">commit 6ebaa22 · fix(ci)</a>
+    <span class="dot"></span>
+    <span>dafahaha/transit-truth</span>
+    <span class="dot"></span>
+    <span>Daizhi Liao</span>
+  </div>
+</header>
+<blockquote>
+<p>相关提交：<a href="https://github.com/dafahaha/transit-truth/commit/6ebaa22">dafahaha/transit-truth · 6ebaa22</a>，<code>fix(ci): declare numpy/scipy deps missing from clean install</code>。
+改动也就两行依赖，但它暴露的问题特别典型：你本机跑得欢，不代表干净环境跑得动。记一下。</p>
+</blockquote>
+<h2>起因：CI #30 红了</h2>
+<p>我在做 transit-truth——一个 AI API 中转站验真器，跑一些统计探针去判断你买的"gpt-4o"到底是不是真的。CI 配的是 Python 3.10 / 3.11 / 3.12 三矩阵，步骤很朴素：</p>
+<pre><code class="language-bash">cd backend
+pip install -r requirements.txt
+pip install pytest
+python -c &quot;from app.main import app&quot;
+</code></pre>
+<p>本来只是想在合并前确认一下"在干净机器上能 import 起来"。结果 CI #30 直接红了，日志末尾是这么一段：</p>
+<pre><code>File &quot;&lt;string&gt;&quot;, line 1, in &lt;module&gt;
+  File &quot;app\main.py&quot;, line 14, in &lt;module&gt;
+    from .api.audit import router as audit_router
+  File &quot;app\api\audit.py&quot;, line 4, in &lt;module&gt;
+    from ..core.auditor import AuditEngine
+  File &quot;app\core\auditor.py&quot;, line 16, in &lt;module&gt;
+    from .fingerprint import ModelFingerprinter
+  File &quot;app\core\fingerprint.py&quot;, line 37, in &lt;module&gt;
+    from .statistical_analyzer import StatisticalAnalyzer
+  File &quot;app\core\statistical_analyzer.py&quot;, line 24, in &lt;module&gt;
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+</code></pre>
+<h2>离谱的地方：我本地明明能跑</h2>
+<p>最别扭的是，这个 <code>python -c "from app.main import app"</code> 我在本地跑过一百遍，从来没失败过。</p>
+<p>我本地用的是 anaconda 的 Python，环境里 numpy、scipy、pandas、matplotlib 全都躺着——毕竟平时写数据分析脚本就在这个环境里。所以我写 <code>import numpy as np</code> 的时候，它当然能 import 成功，我从头到尾没觉得这是个"外部依赖"，只把它当成"环境里本来就有的东西"。</p>
+<p>而 CI 呢？它拿的是 GitHub Actions 上一个干干净净的 Python 镜像，只做了 <code>pip install -r requirements.txt</code>。我翻出那份 requirements 一看：</p>
+<pre><code>fastapi&gt;=0.104.0
+uvicorn[standard]&gt;=0.24.0
+httpx&gt;=0.25.0
+pydantic&gt;=2.5.0
+tiktoken&gt;=0.5.0
+</code></pre>
+<p>好家伙，numpy 和 scipy 一个字都没提。</p>
+<p>根因一句话就能说清：<strong>依赖只在我本机恰好存在，却从没被写进声明。</strong> anaconda 帮我"隐式"提供了它们，CI 机器没人替我提供，于是当场炸。</p>
+<h2>在干净环境里复现一次</h2>
+<p>读 CI 日志不如自己复现一遍。我新建了一个空 venv，只装 requirements 里那几个包，然后试着 import：</p>
+<pre><code class="language-powershell">python -m venv ttclean
+.\ttclean\Scripts\pip install fastapi &quot;uvicorn[standard]&quot; httpx tiktoken pydantic
+cd backend
+..\ttclean\Scripts\python -c &quot;from app.main import app&quot;
+</code></pre>
+<p>报错和 CI 一模一样：<code>ModuleNotFoundError: No module named 'numpy'</code>。这就把问题从"CI 又抽风了"坐实成了"我漏声明了"。</p>
+<p>接着我做了件挺有收获的事——只补 numpy，不补 scipy：</p>
+<pre><code>File &quot;app\core\statistical_analyzer.py&quot;, line 25, in &lt;module&gt;
+    from scipy import stats
+ModuleNotFoundError: No module named 'scipy'
+</code></pre>
+<p>原来缺的是两个。它们就挨在 <code>statistical_analyzer.py</code> 的第 24、25 行：</p>
+<pre><code class="language-python">import numpy as np
+from scipy import stats
+</code></pre>
+<p>这个文件是做统计检验的核心——拿探针返回的分布去和"理论上应该长这样"的参考分布比，用的就是 scipy 的 Mann-Whitney U 那一套。代码里确实用得到，不是手滑 import 的，所以补声明是对的。</p>
+<h2>为什么 import 阶段就炸，而不是跑到一半</h2>
+<p>一开始我有点奇怪：我又没真的跑审计，只是 <code>import app.main</code>，怎么就把 numpy 拖下水了？</p>
+<p>顺着 traceback 看 import 链就明白了：</p>
+<pre><code>app.main
+  → app.api.audit        (挂路由时就要 import 这个模块)
+    → app.core.auditor
+      → app.core.fingerprint
+        → app.core.statistical_analyzer   ← 这里顶层 import numpy
+</code></pre>
+<p><code>import numpy</code> 是写在模块顶层的，不是包在某个函数里。Python 的规则是<strong>import 一个模块时，它顶层的所有 import 都必须立刻满足</strong>。所以只要有人 import 了 <code>statistical_analyzer</code>（哪怕根本不调用里面的函数），numpy 就必须在场。这条链上每个模块都在顶层互相 import，于是"起个服务"和"用 numpy"被绑死在了一起。</p>
+<p>这也解释了为什么我本地没感觉：anaconda 环境里 numpy 一直在，import 链顺顺当当；干净环境里链一拉到底，第一块缺的砖就露出来了。</p>
+<h2>修：requirements 和 pyproject 都要写</h2>
+<p>修法很直接，把两个包补进依赖声明。但这里有个小坑：这个仓库有<strong>两处</strong>依赖声明，CI 用的是 <code>requirements.txt</code>，打包用的是 <code>pyproject.toml</code>，得对齐：</p>
+<pre><code>numpy&gt;=1.24.0
+scipy&gt;=1.11.0
+</code></pre>
+<p>补完再回到那个干净 venv：先装 numpy、再装 scipy，最后 <code>python -c "from app.main import app"</code>——这次它安静地起完了整个 app，没再吐 traceback。</p>
+<p>顺带一提，修这个 CI 的前一个 commit 是 <code>c9586e7</code>，message 是 <code>fix: remove BOM from pyproject.toml breaking tomllib parse in CI</code>。说起来是同一类病：我在 Windows 上保存 pyproject 时带了 BOM，本地的 pip 宽容地忽略了，Linux CI 上的 <code>tomllib</code> 却严格到读不了这个文件。一个是"本机恰好装了"，一个是"本机恰好宽容"——都是把"我这台机器的状态"误当成了"代码本身的状态"。</p>
+<h2>几点体会</h2>
+<ul>
+<li><strong>判断依赖该写什么，要以干净环境为准，不是以你的机器为准。</strong> anaconda 是个大杂货铺，它里面有的包不等于你的项目需要它。</li>
+<li><strong>import 时炸的依赖，比运行时炸的更隐蔽。</strong> 你不触发那条代码路径就永远发现不了；好在 CI 的第一步 <code>python -c "import app"</code> 正好把这种问题提前炸了出来，这一步我觉得加得值。</li>
+<li><strong>requirements.txt 和 pyproject.toml 是两份真相，必须手动对齐。</strong> CI 读一份、打包读另一份，漏一处就是另一个环境再炸一次。</li>
+<li><strong>看到 traceback 别只看最后一行。</strong> 那个 import 链从 <code>main.py</code> 一路串到 <code>statistical_analyzer.py</code>，它本身就告诉你"问题不在 main，在链尾那个统计模块"，顺着翻过去就是。</li>
+<li><strong>别假设 CI 机器和你一样。</strong> 操作系统、Python 版本、有没有预装科学计算栈、文件编码宽容度——每一个差异都可能在你本地看不出、在 CI 上现形。</li>
+</ul>
+<p>这种 bug 没有技术含量，但它太常见了：本地绿、CI 红，一半以上都是"我以为它本来就有"。修干净它，比硬凑一个花里胡哨的新功能更让我安心。</p>
+<footer>
+  <a href="index.html">&larr; Blog</a> &nbsp;&middot;&nbsp; More on
+  <a href="https://github.com/dafahaha" target="_blank" rel="noopener">github.com/dafahaha</a>.
+</footer>
+</div>
+</body>
+</html>
