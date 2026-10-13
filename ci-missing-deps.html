@@ -137,7 +137,7 @@ ModuleNotFoundError: No module named 'scipy'
 <pre><code class="language-python">import numpy as np
 from scipy import stats
 </code></pre>
-<p>这个文件是做统计检验的核心——拿探针返回的分布去和"理论上应该长这样"的参考分布比，用的就是 scipy 的 Mann-Whitney U 那一套。代码里确实用得到，不是手滑 import 的，所以补声明是对的。</p>
+<p>这个文件是做统计检验的核心——拿探针返回的分布去和"理论上应该长这样"的参考分布比，用的就是 scipy 的 chi-square / KS tests 那一套。代码里确实用得到，不是手滑 import 的，所以补声明是对的。</p>
 <h2>为什么 import 阶段就炸，而不是跑到一半</h2>
 <p>一开始我有点奇怪：我又没真的跑审计，只是 <code>import app.main</code>，怎么就把 numpy 拖下水了？</p>
 <p>顺着 traceback 看 import 链就明白了：</p>

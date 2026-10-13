@@ -79,7 +79,7 @@ import numpy as np
 from scipy import stats
 ```
 
-这个文件是做统计检验的核心——拿探针返回的分布去和"理论上应该长这样"的参考分布比，用的就是 scipy 的 Mann-Whitney U 那一套。代码里确实用得到，不是手滑 import 的，所以补声明是对的。
+这个文件是做统计检验的核心——拿探针返回的分布去和"理论上应该长这样"的参考分布比，用的就是 scipy 的 chi-square / KS tests 那一套。代码里确实用得到，不是手滑 import 的，所以补声明是对的。
 
 ## 为什么 import 阶段就炸，而不是跑到一半
 
