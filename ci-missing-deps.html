@@ -95,7 +95,7 @@ pip install -r requirements.txt
 pip install pytest
 python -c &quot;from app.main import app&quot;
 </code></pre>
-<p>本来只是想在合并前确认一下"在干净机器上能 import 起来"。结果 CI #30 直接红了，日志末尾是这么一段：</p>
+<p>本来只是想在合并前确认一下"在干净机器上能 import 起来"。结果 CI #30 直接红了。报错的 import 链和下面这段完全一致（下方 traceback 是我在本地 Windows 干净 venv 复现时的样式，路径显示为反斜杠；CI 跑在 ubuntu-latest 上，同样的报错路径用正斜杠，错误类型与行号一一对应）：</p>
 <pre><code>File &quot;&lt;string&gt;&quot;, line 1, in &lt;module&gt;
   File &quot;app\main.py&quot;, line 14, in &lt;module&gt;
     from .api.audit import router as audit_router

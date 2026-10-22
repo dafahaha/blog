@@ -14,7 +14,7 @@ pip install pytest
 python -c "from app.main import app"
 ```
 
-本来只是想在合并前确认一下"在干净机器上能 import 起来"。结果 CI #30 直接红了，日志末尾是这么一段：
+本来只是想在合并前确认一下"在干净机器上能 import 起来"。结果 CI #30 直接红了。报错的 import 链和下面这段完全一致（下方 traceback 是我在本地 Windows 干净 venv 复现时的样式，路径显示为反斜杠；CI 跑在 ubuntu-latest 上，同样的报错路径用正斜杠，错误类型与行号一一对应）：
 
 ```
 File "<string>", line 1, in <module>
