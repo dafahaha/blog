@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+# [一次性生成器 / ONE-OFF SCRIPT] 本脚本只用于 2026-10 初次把 markdown 转成 HTML，现已不再维护：
+# 仓库以线上 .html 为事实来源（source of truth），请勿重跑本脚本覆盖产物。
+# 重跑会丢失以下不在本模板内的手工增补：
+#   1. head 中的 og:type / og:title / og:description / og:url 社交标签；
+#   2. data-URI SVG favicon；
+#   3. footer 里的 Home 外链（https://dafahaha.github.io/）；
+#   4. 正文 blockquote 内联外链的 target="_blank" rel="noopener"。
+# 如需改版面或内容，直接编辑 textworld-bug-fix.html，不要回到本脚本。
 import io, markdown, re, datetime
 
 src = r'D:\github项目\blog\textworld-bug-fix.md'

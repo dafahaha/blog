@@ -26,7 +26,7 @@ File "<string>", line 1, in <module>
     from .fingerprint import ModelFingerprinter
   File "app\core\fingerprint.py", line 37, in <module>
     from .statistical_analyzer import StatisticalAnalyzer
-  File "app\core\statistical_analyzer.py", line 24, in <module>
+  File "app\core\statistical_analyzer.py", line 23, in <module>
     import numpy as np
 ModuleNotFoundError: No module named 'numpy'
 ```
@@ -67,12 +67,12 @@ cd backend
 接着我做了件挺有收获的事——只补 numpy，不补 scipy：
 
 ```
-File "app\core\statistical_analyzer.py", line 25, in <module>
+File "app\core\statistical_analyzer.py", line 24, in <module>
     from scipy import stats
 ModuleNotFoundError: No module named 'scipy'
 ```
 
-原来缺的是两个。它们就挨在 `statistical_analyzer.py` 的第 24、25 行：
+原来缺的是两个。它们就挨在 `statistical_analyzer.py` 的第 23、24 行：
 
 ```python
 import numpy as np
@@ -105,8 +105,10 @@ app.main
 
 ```
 numpy>=1.24.0
-scipy>=1.11.0
+scipy>=1.10.0
 ```
+
+注：以上是提交 `6ebaa22` 当时写进 `requirements.txt` / `pyproject.toml` 的版本下限；后续版本已把 scipy 上调到 `1.11.0`，那是之后的调整，不属于这个提交。
 
 补完再回到那个干净 venv：先装 numpy、再装 scipy，最后 `python -c "from app.main import app"`——这次它安静地起完了整个 app，没再吐 traceback。
 

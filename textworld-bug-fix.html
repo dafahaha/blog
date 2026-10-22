@@ -8,6 +8,7 @@
 <meta property="og:title" content="给微软 TextWorld 修了个 bug：一行正则，和它背后的多命令解析">
 <meta property="og:description" content="一行多命令导致 TextWorld 环境崩溃。根因是贪婪正则配合 DOTALL 把两个状态块缝成了一个——记录定位、修复、测试和与维护者 review 的全过程。">
 <meta property="og:url" content="https://dafahaha.github.io/blog/textworld-bug-fix.html">
+<link rel="canonical" href="https://dafahaha.github.io/blog/textworld-bug-fix.html">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230071e3'/><text x='50' y='68' font-size='52' font-family='-apple-system,sans-serif' font-weight='700' fill='white' text-anchor='middle'>L</text></svg>">
 <style>
 :root{
@@ -84,7 +85,7 @@ footer a{color:var(--accent);}
   </div>
 </header>
 <blockquote>
-<p>相关 PR：<a href="https://github.com/microsoft/TextWorld/pull/377">microsoft/TextWorld#377</a>，已合并。
+<p>相关 PR：<a href="https://github.com/microsoft/TextWorld/pull/377" target="_blank" rel="noopener">microsoft/TextWorld#377</a>，已合并。
 改动很小，两个文件，核心是一行正则。但定位它的过程比改它有意思得多，记一下。</p>
 </blockquote>
 <h2>起因</h2>
